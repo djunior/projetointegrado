@@ -6,6 +6,7 @@
 using namespace std;
 using namespace cv;
 
+// Media aritimética
 double mean(double*t,int size){
     double m = 0;
     for (int i=0;i<size;i++){
@@ -14,6 +15,7 @@ double mean(double*t,int size){
     return m/size;
 }
 
+// Calculo da variancia baseado em http://en.wikipedia.org/wiki/Variance#Discrete_random_variable
 double variance(double*t,int size){
     double v = 0;
     for (int i = 0; i < size; i++){
@@ -29,6 +31,7 @@ double variance(double*t,int size){
 int main(){
 	std::cout << "Main.cpp" << std::endl;
 
+    // Carregando as imagens para calcular os histogramas
 	Mat image1 = imread("images/wave_1.png",CV_LOAD_IMAGE_COLOR);
     Mat image2 = imread("images/wave_2.png",CV_LOAD_IMAGE_COLOR);
     Mat image3 = imread("images/wave_3.png",CV_LOAD_IMAGE_COLOR);
@@ -36,12 +39,7 @@ int main(){
     Mat image5 = imread("images/wave_5.png",CV_LOAD_IMAGE_COLOR);
 
     Mat hsv1,hsv2,hsv3,hsv4,hsv5;
-
-	//std::cout << "Mat image pointer " << &image << std::endl;
-
-	//std::cout << "Mat image data " << image.data << std::endl;
-
-	// imshow("teste",image);
+    MatND hist1,hist2,hist3,hist4,hist5;
 
 	cvtColor(image1, hsv1, CV_BGR2HSV);
     cvtColor(image2, hsv2, CV_BGR2HSV);
@@ -50,16 +48,17 @@ int main(){
     cvtColor(image5, hsv5, CV_BGR2HSV);
 
 
+    // Esses valores são necessários para calcular o histograma, são basicamente os mesmos
+    // do exemplo da documentação do OpenCV
 	int hbins = 30, sbins = 32;
 	int histSize[] = {hbins, sbins};
-
 	float hranges[] = {0,180};
 	float sranges[] = {0,256};
 	const float* ranges[] = {hranges,sranges};
-
-	MatND hist1,hist2,hist3,hist4,hist5;
 	int channels[] = {0,1};
 
+
+    // Calculando os histogramas
     calcHist( &hsv1, 1, channels, Mat(), // do not use mask
          hist1, 2, histSize, ranges,
          true, // the histogram is uniform
@@ -85,9 +84,16 @@ int main(){
          true, // the histogram is uniform
          false );
 
+    // Correlação do histograma 1 com o histograma 2
     double correlation12 = compareHist(hist1,hist2,CV_COMP_CORREL);
+
+    // Correlação do histograma 1 com o histograma 3
     double correlation13 = compareHist(hist1,hist3,CV_COMP_CORREL);
+
+    // Correlação do histograma 1 com o histograma 4
     double correlation14 = compareHist(hist1,hist4,CV_COMP_CORREL);
+
+    // Correlação do histograma 1 com o histograma 5
     double correlation15 = compareHist(hist1,hist5,CV_COMP_CORREL);
 
     double correlation[] = {correlation12,correlation13,correlation14,correlation15};
@@ -97,31 +103,8 @@ int main(){
     std::cout << "CORRELATION 1 4: " << correlation14 << std::endl;
     std::cout << "CORRELATION 1 5: " << correlation15 << std::endl;
 
-    // double maxVal=0;
-    // minMaxLoc(hist, 0, &maxVal, 0, 0);
-
-    // int scale = 30;
-    // Mat histImg = Mat::zeros(sbins*scale, hbins*scale, CV_8UC3);
-
-    // for( int h = 0; h < hbins; h++ )
-    //     for( int s = 0; s < sbins; s++ )
-    //     {
-    //         float binVal = hist.at<float>(h, s);
-    //         int intensity = cvRound(binVal*255/maxVal);
-    //         rectangle( histImg, Point(h*scale, s*scale),
-    //                     Point( (h+1)*scale - 1, (s+1)*scale - 1),
-    //                     Scalar::all(intensity),
-    //                     CV_FILLED );
-    //     }
-
-    // namedWindow( "Source", 1 );
-    // imshow( "Source", image );
-
-    // namedWindow( "H-S Histogram", 1 );
-    // imshow( "H-S Histogram", histImg );
-
+    // Preparando os dados que serão exibidos na tela
     int width = 400, height = 400;
-
     Mat histImage( width, height, CV_8UC3, Scalar( 0,0,0) );
 
     int w1 = width/5;
@@ -134,18 +117,22 @@ int main(){
     int h3 = (correlation14)*height;
     int h4 = (correlation15)*height;
 
-    double m = mean(correlation,4);
-    double v = variance(correlation,4);
-
-    std::cout << "Media: " << m << std::endl;
-    std::cout << "Variancia: " << v << std::endl;
-
+    // Grafico da evolução da correlação
     line(histImage, Point(w1,h1), Point(w2,h2), Scalar(255,0,0), 2, 8, 0);
     line(histImage, Point(w2,h2), Point(w3,h3), Scalar(0,255,0), 2, 8, 0);
     line(histImage, Point(w3,h3), Point(w4,h4), Scalar(0,0,255), 2, 8, 0);
 
     namedWindow("calcHist Demo", CV_WINDOW_AUTOSIZE );
     imshow("calcHist Demo", histImage );
+
+
+    // Calculando a media e variancia
+    double m = mean(correlation,4);
+    double v = variance(correlation,4);
+
+    std::cout << "Media: " << m << std::endl;
+    std::cout << "Variancia: " << v << std::endl;
+
 
 	waitKey(0);
 
