@@ -35,14 +35,15 @@ def create(array,width = 500,height = 300):
 
 	steps = workWidth / (len(array)-1)
 	resolution = workHeight / (max(array) - min(array))
+	offset = (-1)*min(array) * resolution
 	print "Steps: " + str(steps)
 	print "Resolution: " + str(resolution)
 
 	for index in range(0,len(array)-1):	
 		x1 = int(startX + index*steps)
-		y1 = startY+ workHeight - int(array[index]*resolution)
+		y1 = startY+ workHeight - int((array[index]*resolution + offset))
 		x2 = int(startX + (index+1)*steps)
-		y2 = startY+ workHeight - int(array[index+1]*resolution)
+		y2 = startY+ workHeight - int((array[index+1]*resolution + offset))
 		print "(x,y) = (" + str(x1) + "," + str(y1) + "), to (x,y) = (" + str(x2) + "," + str(y2) + ")"
 		cv2.line(img,(x1,y1),(x2,y2),(255,0,0),5)
 
