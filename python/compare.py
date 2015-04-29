@@ -46,7 +46,7 @@ def compare(x, y):
 		'''
 
 	hist_01 = cv2.calcHist([img_01], [2], None, [256], [0, 256])
-	hist_02 = cv2.calcHist([img_02], [2l], None, [256], [0, 256])
+	hist_02 = cv2.calcHist([img_02], [2], None, [256], [0, 256])
 	correl = cv2.compareHist(hist_01, hist_02, cv.CV_COMP_CORREL)
 
 #	return correl
@@ -140,6 +140,7 @@ if __name__ == '__main__':
 	waves = sys.argv[1:]
 	correl_array = []
 	gradient_array = []
+		
 	for i in range(1, len(waves)):
 		correl = compare(sys.argv[i], sys.argv[i + 1])
 		correl_array.append(correl)
