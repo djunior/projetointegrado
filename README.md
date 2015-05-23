@@ -15,3 +15,5 @@ python-picamera (apt-get install python-picamera)
 Periféricos:
 Sensor AM2303 (DHT22)
 Camera PiCamera NoIR
+
+wget https://bitbucket.org/MattHawkinsUK/rpispy-misc/raw/master/python/lcd_16x2.py
