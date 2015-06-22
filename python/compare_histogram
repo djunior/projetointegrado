@@ -1,0 +1,216 @@
+#!/usr/bin/env python
+# IMPORTS
+import cv2
+import cv
+import numpy
+import sys
+import math
+import os
+import Adafruit_DHT as DHT
+import read_spi as SPI
+
+# CONSTANTS
+INTERVAL = 2.0
+BETA = 0.4
+WAVE_VALUES = {'FLAT': [0, 0.2], 'SMALL': [0.2, 0.4], 'MEDIUM': [0.4, 0.7], 'BIG': [0.7, 1.2], 'HUGE': [1.2, 100]}
+
+#WIND SPEED CONVERTION
+ANEMOMETER_MIN_VOLT = 0.4
+ANEMOMETER_MAX_VOLT = 2.0
+ANEMOMETER_MIN_WIND_SPEED = 0.0
+ANEMOMETER_MAX_WIND_SPEED = 70.0
+ANEMOMETER_LINEAR_COEFFICIENT = (ANEMOMETER_MAX_VOLT - ANEMOMETER_MIN_VOLT)/(ANEMOMETER_MAX_WIND_SPEED - ANEMOMETER_MIN_WIND_SPEED)
+ANEMOMETER_LINEAR_CONSTANT = ANEMOMETER_MIN_WIND_SPEED - ANEMOMETER_MIN_VOLT * ANEMOMETER_LINEAR_COEFFICIENT
+
+#TEMPERATURE AND HUMIDITY SENSOR
+DHT22_PIN = "21"
+
+#ARGUMENTS
+BEACH_ID = os.getenv("GOSURF_BEACH_ID")
+BEACH_NAME = os.getenv("GOSURF_BEACH_NAME")
+print "BEACH ID: " + str(BEACH_ID)
+print "BEACH NAME: " + str(BEACH_NAME)
+BEACH_TEMPERATURE = 0.0
+BEACH_HUMIDITY = 0.0
+BEACH_WIND_SPEED = 0.0
+
+# RESULTS
+WAVE_INTERVAL = 0
+WAVE_HEIGHT = 0
+
+# FUNCTIONS
+
+# COMPARE 2 HISTOGRAMS
+def compare(x, y):
+
+	img_01 = cv2.imread(x)
+	img_02 = cv2.imread(y)
+
+	channels = [0, 1, 2]
+
+	correls = []
+
+	for channel in channels:
+		hist_01 = cv2.calcHist([img_01], [channel], None, [256], [0, 256])
+		hist_02 = cv2.calcHist([img_02], [channel], None, [256], [0, 256])
+
+		correl = cv2.compareHist(hist_01, hist_02, cv.CV_COMP_CORREL)
+		chisqr = cv2.compareHist(hist_01, hist_02, cv.CV_COMP_CHISQR)
+		intersect = cv2.compareHist(hist_01, hist_02, cv.CV_COMP_INTERSECT)
+		bhattacharyya = cv2.compareHist(hist_01, hist_02, cv.CV_COMP_BHATTACHARYYA)
+		
+		correls.append(correl)
+
+		'''
+		print 'Channel ' + str(channel) 
+		print 'Correlation: ' + str(correl)
+		print 'Chi-Squared: ' + str(chisqr)
+		print 'Intersection: ' + str(intersect)
+		print 'Bhattacharrya Distance: ' + str(bhattacharyya)  
+		'''
+
+	hist_01 = cv2.calcHist([img_01], [2], None, [256], [0, 256])
+	hist_02 = cv2.calcHist([img_02], [2], None, [256], [0, 256])
+	correl = cv2.compareHist(hist_01, hist_02, cv.CV_COMP_CORREL)
+
+	
+#	return correl
+	return get_mean(correls)
+
+def get_temp_and_humidity():
+	return DHT.read_retry(DHT.DHT22,DHT22_PIN)
+
+'''
+def get_wind_speed():
+	serialInput = serial.Serial("/dev/ttyACM0",9600)
+	line = serialInput.readline()
+	windSpeedStr = line.replace("\r\n","")
+	print windSpeedStr
+	windSpeedList = windSpeedStr.split(",")
+	print windSpeedList
+	for i in range(0,len(windSpeedList)):
+		windSpeedList[i] = float(windSpeedList[i])
+	return get_mean(windSpeedList)
+'''
+
+def get_wind_speed():
+	data = SPI.read(0)
+	float_value = SPI.convert_float(data)
+	windSpeed = ANEMOMETER_LINEAR_COEFFICIENT*float_value + ANEMOMETER_LINEAR_CONSTANT
+	return windSpeed
+
+def get_wave_break(correl_array):
+	min_correl = 1
+	index = 0 
+	for i in range(0, len(correl_array)):
+		correl = correl_array[i]
+		if correl < min_correl:
+			index = i
+			min_correl = correl
+
+	return [index, min_correl]
+
+
+def get_wave_period(correl_array):
+	mean = get_mean(correl_array)
+	std_deviation = get_std_deviation(correl_array)
+	std_error = get_std_error(correl_array)
+
+	wave_breaks = []
+	MARGIN = 2
+
+	for i in range(0, len(correl_array)):
+		if correl_array[i] < mean - std_deviation:
+			if not check_in_margin(wave_breaks, i, MARGIN):
+				wave_breaks.append(i)
+
+
+	if len(wave_breaks) == 1:
+		return 0
+	else:
+		wave_interval =  (wave_breaks[-1] - wave_breaks[0]) / (len(wave_breaks) - 1)
+		return wave_interval * INTERVAL
+
+
+def check_in_margin(list, x, margin):
+	if margin == 0:
+		return False
+	elif math.fabs(x - margin) in list:
+		return True
+	else:
+		return check_in_margin(list, x, margin - 1)
+
+def get_wave_height(correl_array, index):
+	x = math.fabs(correl_array[index - 1] - correl_array[index - 2])
+	a = 1 / (INTERVAL * BETA)
+	
+	return a * x
+
+def get_wave_value(h):
+	for key in WAVE_VALUES:
+		if h > WAVE_VALUES[key][0] and h < WAVE_VALUES[key][1]:
+			return key
+
+def get_mean(x):
+	sum = 0
+	N = len(x)
+	for y in x:
+		sum += y
+
+	mean = sum / N
+	return mean
+
+def get_std_error(x):
+	return get_std_deviation(x) / math.sqrt(len(x))
+
+def get_std_deviation(x):
+	mean = get_mean(x)
+	aux = 0
+	for y in x:
+		aux += (y - mean) ** 2
+
+	std_deviation = math.sqrt(aux / len(x))
+	return std_deviation
+
+if __name__ == '__main__':
+	waves = sys.argv[1:]
+	correl_array = []
+
+	for i in range(1, len(waves)):
+		correl = compare(sys.argv[i], sys.argv[i + 1])
+		correl_array.append(correl)
+
+
+
+	WAVE_INTERVAL = get_wave_period(correl_array)
+	print 'WAVE INTERVAL: ' + str(WAVE_INTERVAL)	
+
+	min = get_wave_break(correl_array)
+#	print min
+	index = min[0]
+	WAVE_HEIGHT = get_wave_height(correl_array, index)
+	print 'WAVE HEIGHT: ' + str(WAVE_HEIGHT)	
+	WAVE_VALUE = get_wave_value(WAVE_HEIGHT)
+	print 'WAVE VALUE: ' + WAVE_VALUE
+
+	os.system('rm -rf /tmp/.gosurf/')
+	os.system("mkdir /tmp/.gosurf")
+	print waves
+	print 'cp ' + waves[index - 3] + ' /tmp/.gosurf/wave_01.png'
+
+	os.system('cp ' + waves[index - 3] + ' /tmp/.gosurf/wave_01.png')
+	os.system('cp ' + waves[index - 2] + ' /tmp/.gosurf/wave_02.png')
+	os.system('cp ' + waves[index - 1] + ' /tmp/.gosurf/wave_03.png')
+
+	BEACH_HUMIDITY, BEACH_TEMPERATURE = get_temp_and_humidity()
+	BEACH_WIND_SPEED = get_wind_speed()
+
+	print "Beach ID: " + str(BEACH_ID)
+	print "Beach Name: " + str(BEACH_NAME)
+	print "Temperatura: " + str(BEACH_TEMPERATURE)
+	print "Velocidade do vento: " + str(BEACH_WIND_SPEED)
+	print "Chamando script de envio de dados..."
+
+	os.system('gosurf ' + BEACH_ID + ' ' + BEACH_NAME + ' ' + str(int(WAVE_HEIGHT * 10)) + ' ' + WAVE_VALUE + ' ' + str(BEACH_TEMPERATURE) + ' ' + str(BEACH_WIND_SPEED) )	
+
+

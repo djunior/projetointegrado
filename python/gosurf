@@ -1,0 +1,104 @@
+#!/usr/bin/env python
+'''
+Example: python gosurf.py 001 Itacoatiara 4 small 30 10
+'''
+
+# IMPORTS
+import boto
+import boto.dynamodb2
+from boto.dynamodb2.table import Table
+from boto.s3.key import Key
+import sys
+import os
+from datetime import datetime
+import random
+
+
+# VARIABLES
+AWS_ACCESS_KEY_ID = os.getenv("AWS_ACCESS_KEY_ID")
+AWS_SECRET_ACCESS_KEY = os.getenv("AWS_SECRET_ACCESS_KEY")
+print AWS_ACCESS_KEY_ID
+S3_BUCKET_NAME = 'go-surf-images'
+DYNAMODB_CONDITIONS_TABLE = 'go-surf-conditions-2'
+DYNAMODB_RATINGS_TABLE = 'go-surf-ratings-55-21'
+UPLOAD_IMAGES_DIR = '/tmp/.gosurf/'
+
+
+# FUNCTIONS
+def add_condition_item(table, beach_id, condition_id, rating, beach_name, wave_height, wave_value, temperature, wind, country_code, region_code, timestamp):
+    table.put_item(data={'beach_id': beach_id, 'condition_id': condition_id, 'rating': rating, 'beach_name': beach_name,'wave_height': wave_height, 'wave_value': wave_value, 'temperature': temperature, 'wind': wind, 'country_code' : country_code, 'region_code' : region_code, 'timestamp' : timestamp})
+
+
+#def add_rating_item(table, beach_id, rating):
+#    table.update_item({'beach_id':{'S':beach_id}, data={'beach_id': beach_id, 'rating': rating})
+
+
+def format_date(x):
+    return (str(x) if len(str(x)) > 1 else ('0' + str(x)))
+
+def query_beach_id(table, beach_id):
+    return go_surf_table.query_2(beach_id__eq = beach_id)
+
+def calculate_rating(wave_height, temperature, wind):
+    if (wave_height < 2):
+        return 0
+    else:
+        return str(random.randint(1, 5))
+
+# MAIN
+if __name__ == "__main__":
+    
+    # GET ARGUMENTS
+    beach_id = sys.argv[1]
+    beach_name = sys.argv[2]
+    wave_height = "{0:.1f}".format(float(sys.argv[3]))
+    wave_value = sys.argv[4]
+    temperature = "{0:.1f}".format(float(sys.argv[5]))
+    wind = "{0:.1f}".format(float(sys.argv[6]))
+    
+
+    # CALCULATE RATING
+    rating = calculate_rating(wave_height, temperature, wind)
+    
+
+    # GENERATE CONDITION ID
+    now =  datetime.now()
+    condition_id = str(now.year) + format_date(now.month) + format_date(now.day) + format_date(now.hour) + format_date(now.minute) + format_date(now.second) + beach_id
+
+
+    # CONNECT DO AWS DYNAMODB AND S3
+    dynamodb_connection = boto.dynamodb2.connect_to_region('us-west-2', aws_access_key_id = AWS_ACCESS_KEY_ID, aws_secret_access_key = AWS_SECRET_ACCESS_KEY)
+
+    s3 = boto.connect_s3(AWS_ACCESS_KEY_ID, AWS_SECRET_ACCESS_KEY)
+    
+    # UPLOAD IMAGES DO S3 BUCKET
+    bucket = s3.get_bucket(S3_BUCKET_NAME)
+    key = Key(bucket)
+    for image in os.listdir(UPLOAD_IMAGES_DIR):
+        key.key = condition_id + '/' + image
+        key.set_contents_from_filename(UPLOAD_IMAGES_DIR + '/' + image)
+
+
+    # Query
+    #    items = query(go_surf_table, '001')
+
+    #items = go_surf_table.scan();
+
+    '''
+    for item in items:
+        print item['beach_name'] + ': ' + str(item['wave_height'])
+    '''
+   
+    COUNTRY_CODE = os.environ.get("GOSURF_COUNTRY_CODE")
+    REGION_CODE = os.environ.get("GOSURF_REGION_CODE")
+
+
+    # ADD ITEM TO DYNAMODB
+    go_surf_conditions_table = Table(DYNAMODB_CONDITIONS_TABLE, connection = dynamodb_connection)
+    print "[gosurf] Enviando dados para o servidor..."
+    add_condition_item(go_surf_conditions_table, beach_id, condition_id, rating, beach_name, wave_height, wave_value, temperature, wind,COUNTRY_CODE,REGION_CODE,now.strftime("%Y-%m-%d %H:%M:%S"))
+
+    #go_surf_ratings_table = Table(DYNAMODB_RATINGS_TABLE, connection = dynamodb_connection)
+    #add_rating_item(go_surf_ratings_table, beach_id, rating)
+
+
