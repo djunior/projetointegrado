@@ -17,3 +17,10 @@ Sensor AM2303 (DHT22)
 Camera PiCamera NoIR
 
 wget https://bitbucket.org/MattHawkinsUK/rpispy-misc/raw/master/python/lcd_16x2.py
+
+Scripts:
+* variaveis de ambiente: /usr/local/etc/gosurf
+* logs: /var/local/log/gosurf/
+* script de log: /usr/local/bin/gosurf_logger.sh
+* script de fotos: /usr/local/bin/gosurf_take_picture,sh
+* script de medida e envio para o servidor: /usr/bin/gosurf_beach_reading
