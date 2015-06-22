@@ -19,8 +19,14 @@ Camera PiCamera NoIR
 wget https://bitbucket.org/MattHawkinsUK/rpispy-misc/raw/master/python/lcd_16x2.py
 
 Scripts:
+
+- Bash:
 * variaveis de ambiente: /usr/local/etc/gosurf
 * logs: /var/local/log/gosurf/
 * script de log: /usr/local/bin/gosurf_logger.sh
 * script de fotos: /usr/local/bin/gosurf_take_picture,sh
 * script de medida e envio para o servidor: /usr/bin/gosurf_beach_reading
+
+-Python:
+* processamento de imagens e leitura de sensores: /usr/bin/compare_histogram
+* comunicacao com o servidor: /usr/bin/gosurf
